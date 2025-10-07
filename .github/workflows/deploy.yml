@@ -15,10 +15,10 @@ jobs:
 
     - name: Install Cloud Foundry CLI
       run: |
-        curl -L "https://packages.cloudfoundry.org/stable?release=linux64&source=github" -o cf-cli.tgz
-        tar -xzf cf-cli.tgz -C /usr/local/bin
-        rm cf-cli.tgz
-        cf --version
+        curl -LO https://packages.cloudfoundry.org/stable/cf8-cli_8.0.0_linux_x86-64.tgz
+        tar -xzf cf8-cli_8.0.0_linux_x86-64.tgz
+        sudo mv cf8-cli /usr/local/bin/cf
+        cf version
 
     - name: Setup SSH key for EC2
       run: |
