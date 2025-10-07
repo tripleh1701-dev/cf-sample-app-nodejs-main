@@ -1,6 +1,10 @@
 ---
 applications:
-- name: cf-nodejs
-  memory: 192M
-  instances: 1
-  random-route: false
+  - name: my-node-app
+    memory: 256M
+    instances: 1
+    path: .
+    buildpacks:
+      - nodejs_buildpack
+    env:
+      NODE_ENV: production
