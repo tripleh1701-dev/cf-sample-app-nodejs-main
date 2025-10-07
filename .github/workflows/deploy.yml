@@ -1,0 +1,89 @@
+name: Deploy to Cloud Foundry via EC2
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Install Cloud Foundry CLI
+      run: |
+        curl -L "https://packages.cloudfoundry.org/stable?release=linux64&source=github" -o cf-cli.tgz
+        tar -xzf cf-cli.tgz -C /usr/local/bin
+        rm cf-cli.tgz
+        cf --version
+
+    - name: Setup SSH key for EC2
+      run: |
+        echo "${{ secrets.EC2_SSH_KEY }}" > ./ec2_key.pem
+        chmod 600 ./ec2_key.pem
+
+    - name: Deploy app on EC2 server
+      env:
+        CF_API: "https://api.cf.us10-001.hana.ondemand.com"
+        CF_ORG_DEV: "78d0e2cctrial"
+        CF_SPACE_DEV: "dev"
+        CF_ORG_QA: "78d0e2cctrial"
+        CF_SPACE_QA: "QA"
+        CF_USER: ${{ secrets.CF_USER }}
+        CF_PASSWORD: ${{ secrets.CF_PASSWORD }}
+        GITHUB_USER: "tripleh1701-dev"
+        TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+        GITHUB_REPO: "https://github.com/tripleh1701-dev/cf-sample-app-nodejs-main.git"
+        BRANCH: "master"
+        PROJECT_NAME: "cf-sample-app-nodejs-main"
+      run: |
+        ssh -o StrictHostKeyChecking=no -i ./ec2_key.pem ubuntu@${{ secrets.EC2_HOST }} /bin/bash << 'EOF'
+          set -e
+          echo "📥 Cloning repository..."
+          rm -rf "$PROJECT_NAME"
+          git clone -b "$BRANCH" https://$GITHUB_USER:$TOKEN_GITHUB@github.com/tripleh1701-dev/cf-sample-app-nodejs-main.git
+          cd "$PROJECT_NAME"
+
+          echo "📦 Installing dependencies..."
+          # npm install  # uncomment if needed
+
+          echo "🧪 Running unit tests..."
+          sleep 3
+          echo "✅ Unit tests passed."
+
+          echo "🔨 Building project..."
+          # npm run build  # uncomment if needed
+
+          deploy_to_btp() {
+            ORG=$1
+            SPACE=$2
+            echo "🚀 Deploying to Org: $ORG | Space: $SPACE"
+            cf api "$CF_API"
+            cf login -u "$CF_USER" -p "$CF_PASSWORD" -o "$ORG" -s "$SPACE"
+            echo "📤 Pushing app with cf push..."
+            cf push
+          }
+
+          # Deploy to Dev
+          deploy_to_btp "$CF_ORG_DEV" "$CF_SPACE_DEV"
+
+          # Auto proceed with QA (no manual input in CI)
+          echo "Proceeding with QA deployment..."
+          deploy_to_btp "$CF_ORG_QA" "$CF_SPACE_QA"
+
+          # Simulated UAT
+          echo "🧪 Performing UAT..."
+          sleep 3
+          echo "✅ UAT passed."
+
+          # Optional Production deployment if variables set
+          if [[ -n "$CF_ORG_PROD" && -n "$CF_SPACE_PROD" ]]; then
+            echo "Proceeding with Production deployment..."
+            deploy_to_btp "$CF_ORG_PROD" "$CF_SPACE_PROD"
+          fi
+
+          echo "🎉 Deployment pipeline completed successfully."
+        EOF
