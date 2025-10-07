@@ -43,39 +43,39 @@ jobs:
           ssh -t -o StrictHostKeyChecking=no -i ./ec2_key.pem ubuntu@${{ secrets.EC2_HOST }} /bin/bash << EOF
             set -e
 
-            echo "📥 Cloning repository..."
+            echo " Cloning repository..."
             rm -rf "$PROJECT_NAME"
             git clone -b "$BRANCH" https://$GITHUB_USER:$TOKEN_GITHUB@github.com/$GITHUB_USER/$PROJECT_NAME.git
             cd "$PROJECT_NAME"
 
-            echo "📦 Installing dependencies..."
+            echo " Installing dependencies..."
             npm install
 
-            echo "🧪 Running unit tests..."
+            echo " Running unit tests..."
             sleep 3
-            echo "✅ Unit tests passed."
+            echo " Unit tests passed."
 
-            echo "🔨 Building project..."
+            echo " Building project..."
             # npm run build  # Uncomment if needed
 
             deploy_to_btp() {
               ORG=\$1
               SPACE=\$2
-              echo "🚀 Deploying to Org: \$ORG | Space: \$SPACE"
+              echo "Deploying to Org: \$ORG | Space: \$SPACE"
               cf api "$CF_API"
               cf login -u "$CF_USER" -p "$CF_PASSWORD" -o "\$ORG" -s "\$SPACE"
-              echo "📤 Pushing app with cf push..."
+              echo " Pushing app with cf push..."
               cf push
             }
 
             deploy_to_btp "$CF_ORG_DEV" "$CF_SPACE_DEV"
 
-            echo "🚀 Proceeding with QA deployment..."
+            echo " Proceeding with QA deployment..."
             deploy_to_btp "$CF_ORG_QA" "$CF_SPACE_QA"
 
-            echo "🧪 Performing UAT..."
+            echo " Performing UAT..."
             sleep 3
-            echo "✅ UAT passed."
+            echo " UAT passed."
 
-            echo "🎉 Deployment pipeline completed successfully."
+            echo "Deployment pipeline completed successfully."
           EOF
