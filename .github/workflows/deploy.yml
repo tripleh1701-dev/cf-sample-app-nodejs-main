@@ -1,84 +1,53 @@
-name: Deploy to Cloud Foundry via EC2
-
-on:
-  push:
-    branches:
-      - master
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-
-    - name: Install Cloud Foundry CLI
-      run: |
-        wget -q -O - https://packages.cloudfoundry.org/debian/cli.cloudfoundry.org.key | sudo apt-key add -
-        echo "deb https://packages.cloudfoundry.org/debian stable main" | sudo tee /etc/apt/sources.list.d/cloudfoundry-cli.list
-        sudo apt-get update
-        sudo apt-get install -y cf8-cli
-        cf version
-
-    - name: Setup SSH key for EC2
-      run: |
-        echo "${{ secrets.EC2_SSH_KEY }}" > ec2_key.pem
-        chmod 600 ec2_key.pem
-
-    - name: Test SSH connection to EC2
-      run: |
-        ssh -t -o StrictHostKeyChecking=no -i ec2_key.pem ubuntu@${{ secrets.EC2_HOST }} echo "SSH connection successful!"
-
-    - name: Deploy app on EC2 server
-      env:
-        CF_API: "https://api.cf.us10-001.hana.ondemand.com"
-        CF_ORG_DEV: "78d0e2cctrial"
-        CF_SPACE_DEV: "dev"
-        CF_ORG_QA: "78d0e2cctrial"
-        CF_SPACE_QA: "QA"
-        CF_USER: ${{ secrets.CF_USER }}
-        CF_PASSWORD: ${{ secrets.CF_PASSWORD }}
-        GITHUB_USER: "tripleh1701-dev"
-        TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
-        BRANCH: "master"
-        PROJECT_NAME: "cf-sample-app-nodejs-main"
-      run: |
-        ssh -t -o StrictHostKeyChecking=no -i ec2_key.pem ubuntu@${{ secrets.EC2_HOST }} /bin/bash << 'EOF'
-          set -e
-
-          echo "📥 Cloning repository..."
-          rm -rf "$PROJECT_NAME"
-          git clone -b "$BRANCH" https://$GITHUB_USER:$TOKEN_GITHUB@github.com/tripleh1701-dev/$PROJECT_NAME.git
-          cd "$PROJECT_NAME"
-
-          echo "📦 Installing dependencies..."
-          npm install
-
-          echo "🧪 Running unit tests..."
-          sleep 3
-          echo "✅ Unit tests passed."
-
-          echo "🔨 Building project..."
-          # npm run build  # uncomment if needed
-
-          deploy_to_btp() {
-            ORG=$1
-            SPACE=$2
-            echo "🚀 Deploying to Org: $ORG | Space: $SPACE"
-            cf api "$CF_API"
-            cf login -u "$CF_USER" -p "$CF_PASSWORD" -o "$ORG" -s "$SPACE"
-            echo "📤 Pushing app with cf push..."
-            cf push
-          }
-
-          deploy_to_btp "$CF_ORG_DEV" "$CF_SPACE_DEV"
-          echo "🚀 Proceeding with QA deployment..."
-          deploy_to_btp "$CF_ORG_QA" "$CF_SPACE_QA"
-
-          echo "🧪 Performing UAT..."
-          sleep 3
-          echo "✅ UAT passed."
-
-          echo "🎉 Deployment pipeline completed successfully."
-        EOF
+- name: Deploy app on EC2 server
+  env:
+    CF_API: "https://api.cf.us10-001.hana.ondemand.com"
+    CF_ORG_DEV: "78d0e2cctrial"
+    CF_SPACE_DEV: "dev"
+    CF_ORG_QA: "78d0e2cctrial"
+    CF_SPACE_QA: "QA"
+    CF_USER: ${{ secrets.CF_USER }}
+    CF_PASSWORD: ${{ secrets.CF_PASSWORD }}
+    GITHUB_USER: "tripleh1701-dev"
+    TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+    GITHUB_REPO: "https://github.com/tripleh1701-dev/cf-sample-app-nodejs-main.git"
+    BRANCH: "master"
+    PROJECT_NAME: "cf-sample-app-nodejs-main"
+  run: |
+    ssh -t -o StrictHostKeyChecking=no -i ./ec2_key.pem ubuntu@${{ secrets.EC2_HOST }} /bin/bash << EOF
+      set -e
+      
+      echo "📥 Cloning repository..."
+      rm -rf "$PROJECT_NAME"
+      git clone -b "$BRANCH" https://$GITHUB_USER:$TOKEN_GITHUB@github.com/$GITHUB_USER/$PROJECT_NAME.git
+      cd "$PROJECT_NAME"
+  
+      echo "📦 Installing dependencies..."
+      npm install
+  
+      echo "🧪 Running unit tests..."
+      sleep 3
+      echo "✅ Unit tests passed."
+  
+      echo "🔨 Building project..."
+      # npm run build
+  
+      deploy_to_btp() {
+        ORG=\$1
+        SPACE=\$2
+        echo "🚀 Deploying to Org: \$ORG | Space: \$SPACE"
+        cf api "$CF_API"
+        cf login -u "$CF_USER" -p "$CF_PASSWORD" -o "\$ORG" -s "\$SPACE"
+        echo "📤 Pushing app with cf push..."
+        cf push
+      }
+  
+      deploy_to_btp "$CF_ORG_DEV" "$CF_SPACE_DEV"
+      echo "🚀 Proceeding with QA deployment..."
+      deploy_to_btp "$CF_ORG_QA" "$CF_SPACE_QA"
+  
+      echo "🧪 Performing UAT..."
+      sleep 3
+      echo "✅ UAT passed."
+  
+      echo "🎉 Deployment pipeline completed successfully."
+    EOF
